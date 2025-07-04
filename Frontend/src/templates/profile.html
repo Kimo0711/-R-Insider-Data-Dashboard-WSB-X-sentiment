@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{ profile.name }} - Profile</title>
+    <style>
+        body { font-family: Arial; background-color: #121212; color: #fff; padding: 20px; }
+        .trade {
+            background: #1e1e1e;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+        }
+        a { color: #8ab4f8; }
+    </style>
+</head>
+<body>
+    <a href="/">← Back</a>
+    <h1>{{ profile.name }}</h1>
+    <p>{% if profile.party == "D" %}
+        Democrat
+    {% elif profile.party == "R" %}
+        Republican
+    {% else %}
+        {{ profile.party }}
+    {% endif %}
+    / {{ profile.chamber }}{% if profile.state %} / {{ profile.state }}{% endif %}</p>
+    <h2>Trades ({{ profile.trades | length }})</h2>
+
+    {% for trade in profile.trades %}
+        <div class="trade">
+    <p>
+        <strong>{{ trade.Ticker }}</strong> — {{ trade.Transaction }} : {{ trade.Trade_Size_USD | format_trade_size }}
+        {% if trade.Transaction == "Sale" and trade.excess_return is not none %}
+            <br>
+            <small style="color: #8ab4f8;">
+                Return vs S&P: {{ "%.2f" | format(trade.excess_return | float) }}%
+            </small>
+        {% endif %}
+    </p>
+    <small>Traded: {{ trade.Traded }} | Filed: {{ trade.Filed }}</small>
+</div>
+    {% endfor %}
+</body>
+</html>

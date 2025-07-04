@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Congressional Trades</title>
+    <style>
+        body { font-family: Arial; background-color: #121212; color: #fff; padding: 20px; }
+        .card {
+            background: #1e1e1e;
+            padding: 15px;
+            margin: 10px;
+            border-radius: 10px;
+            display: inline-block;
+            width: 200px;
+        }
+        .card h3 { margin: 5px 0; }
+        .card small { color: #aaa; }
+    </style>
+</head>
+<body>
+    <form method="get" style="margin-bottom: 20px;">
+        <input type="text" name="name" placeholder="Search by name" value="{{ filter_name }}">
+        
+        <select name="party">
+            <option value="">All Parties</option>
+            {% for p in party_options %}
+                <option value="{{ p }}" {% if filter_party == p %}selected{% endif %}>{{ p }}</option>
+            {% endfor %}
+        </select>
+
+        <select name="state">
+            <option value="">All States</option>
+            {% for s in state_options %}
+                <option value="{{ s }}" {% if filter_state == s %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+        </select>
+
+        <button type="submit">Filter</button>
+    </form>
+    <h1>Congressional Trades (Top Traders)</h1>
+
+    {% for p in politicians %}
+    <a href="/politician/{{ p.name | urlencode }}" style="text-decoration: none; color: inherit;">
+        <div class="card">
+            <h3>{{ p.name }}</h3>
+            <p>{{ p.party }} / {{ p.chamber }}{% if p.state %} / {{ p.state }}{% endif %}</p>
+            <p>Trades: {{ p.trades }}</p>
+            <small>Last traded: {{ p.last_traded }}</small>
+        </div>
+    </a>
+    {% endfor %}
+    <div style="margin-top: 30px;">
+    {% if page > 1 %}
+        <a href="/?page={{ 1}}"> << </a>
+        <a href="/?page={{ page - 1 }}"> < </a>
+    {% endif %}
+
+    <span style="margin: 0 10px;">Page {{ page }} of {{ total_pages }}</span>
+
+    {% if page < total_pages %}
+        <a href="/?page={{ page + 1 }}"> > </a>
+        <a href="/?page={{ total_pages }}"> >> </a>
+    {% endif %}
+</div>
+</body>
+</html>
