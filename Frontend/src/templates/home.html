@@ -35,6 +35,13 @@
             {% endfor %}
         </select>
 
+        <select name="committee">
+            <option value="">All Committees</option>
+            {% for c in committee_options %}
+                <option value="{{ c }}" {% if filter_committee == c %}selected{% endif %}>{{ c }}</option>
+            {% endfor %}
+        </select>
+
         <button type="submit">Filter</button>
     </form>
     <h1>Congressional Trades (Top Traders)</h1>

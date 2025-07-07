@@ -24,21 +24,54 @@
         {{ profile.party }}
     {% endif %}
     / {{ profile.chamber }}{% if profile.state %} / {{ profile.state }}{% endif %}</p>
-    <h2>Trades ({{ profile.trades | length }})</h2>
-
+    <h3>Committees</h3>
+    <ul>
+        {% for c in profile.committee %}
+            <li>{{ c }}</li>
+        {% else %}
+            <li>No committee data found</li>
+        {% endfor %}
+    </ul>
     {% for trade in profile.trades %}
         <div class="trade">
-    <p>
-        <strong>{{ trade.Ticker }}</strong> — {{ trade.Transaction }} : {{ trade.Trade_Size_USD | format_trade_size }}
-        {% if trade.Transaction == "Sale" and trade.excess_return is not none %}
-            <br>
-            <small style="color: #8ab4f8;">
-                Return vs S&P: {{ "%.2f" | format(trade.excess_return | float) }}%
-            </small>
-        {% endif %}
-    </p>
-    <small>Traded: {{ trade.Traded }} | Filed: {{ trade.Filed }}</small>
-</div>
+            <li>
+                <strong>{{ trade.company_name }}</strong>
+                <br>
+                {{ trade.Ticker }}
+                {% if trade.industry %}
+                    <br><strong style="color: rgb(241, 182, 182);">
+                        {% if trade.industry == "Unknown" %}
+                            General
+                        {% else %}
+                            {{ trade.industry }}
+                        {% endif %}
+                    </strong>
+                {% endif %}
+                 — {{ trade.Transaction }} — {{ trade.Trade_Size_USD | format_trade_size }}
+            </li>
+
+            {% if trade.Transaction == "Sale" and trade.excess_return is not none %}
+                <small style="color: #8ab4f8;">
+                    Return vs S&amp;P: {{ "%.2f" | format(trade.excess_return | float) }}%
+                </small>
+            {% endif %}
+
+            <small>Traded: {{ trade.Traded }} | Filed: {{ trade.Filed }}</small>
+        </div>
     {% endfor %}
+    <div style="margin-top: 30px;">
+    {% if page > 1 %}
+        <a href="?page={{ 1}}"> << </a>
+        <a href="?page={{ page - 1 }}"> < </a>
+    {% endif %}
+
+    <span style="margin: 0 10px;">Page {{ page }} of {{ total_pages }}</span>
+
+    {% if page < total_pages %}
+        <a href="?page={{ page + 1 }}"> > </a>
+        <a href="?page={{ total_pages }}"> >> </a>
+    {% endif %}
+    </div>
+
 </body>
 </html>
