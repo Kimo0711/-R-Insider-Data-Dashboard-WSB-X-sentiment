@@ -4,7 +4,61 @@
     <meta charset="UTF-8">
     <title>Congressional Trades</title>
     <style>
-        body { font-family: Arial; background-color: #121212; color: #fff; padding: 20px; }
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #121212;
+            color: #fff;
+            padding: 20px;
+            margin: 0;
+        }
+
+        .filter-form {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 12px;
+            background-color: #1e1e1e;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .filter-form input[type="text"],
+        .filter-form select {
+            background-color: #2a2a2a;
+            color: #fff;
+            border: 1px solid #444;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 14px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .filter-form button,
+        .recent-link {
+            background-color: #444444;
+            color: white;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            text-align: center;
+            text-decoration: none;
+        }
+        .recent-link {
+            background-color: #ca0f0f;
+        }
+
+        .filter-form button:hover {
+            background-color: #666;
+        }
+        .recent-link:hover {
+            background-color: #0a4bd8;
+        }
+
         .card {
             background: #1e1e1e;
             padding: 15px;
@@ -13,37 +67,42 @@
             display: inline-block;
             width: 200px;
         }
-        .card h3 { margin: 5px 0; }
-        .card small { color: #aaa; }
+
+        .card h3 {
+            margin: 5px 0;
+        }
+
+        .card small {
+            color: #aaa;
+        }
     </style>
 </head>
 <body>
-    <form method="get" style="margin-bottom: 20px;">
-        <input type="text" name="name" placeholder="Search by name" value="{{ filter_name }}">
-        
+
+    <form method="get" class="filter-form">
+        <input type="text" name="name" placeholder="Find by politician" value="{{ filter_name }}">
         <select name="party">
-            <option value="">All Parties</option>
+            <option value="">Political Party</option>
             {% for p in party_options %}
                 <option value="{{ p }}" {% if filter_party == p %}selected{% endif %}>{{ p }}</option>
             {% endfor %}
         </select>
-
         <select name="state">
-            <option value="">All States</option>
+            <option value="">Politician State</option>
             {% for s in state_options %}
                 <option value="{{ s }}" {% if filter_state == s %}selected{% endif %}>{{ s }}</option>
             {% endfor %}
         </select>
-
         <select name="committee">
-            <option value="">All Committees</option>
+            <option value="">Committee</option>
             {% for c in committee_options %}
                 <option value="{{ c }}" {% if filter_committee == c %}selected{% endif %}>{{ c }}</option>
             {% endfor %}
         </select>
-
         <button type="submit">Filter</button>
+        <a href="/dashboard" class="recent-link">Recent Trades</a>
     </form>
+
     <h1>Congressional Trades (Top Traders)</h1>
 
     {% for p in politicians %}
@@ -56,18 +115,27 @@
         </div>
     </a>
     {% endfor %}
+
     <div style="margin-top: 30px;">
-    {% if page > 1 %}
-        <a href="/?page={{ 1}}"> << </a>
-        <a href="/?page={{ page - 1 }}"> < </a>
-    {% endif %}
+        {% set query_string = (
+            'name=' ~ filter_name ~
+            '&party=' ~ filter_party ~
+            '&state=' ~ filter_state ~
+            '&committee=' ~ filter_committee
+        ) %}
 
-    <span style="margin: 0 10px;">Page {{ page }} of {{ total_pages }}</span>
+        {% if page > 1 %}
+            <a href="/?page=1&{{ query_string }}"> << </a>
+            <a href="/?page={{ page - 1 }}&{{ query_string }}"> < </a>
+        {% endif %}
 
-    {% if page < total_pages %}
-        <a href="/?page={{ page + 1 }}"> > </a>
-        <a href="/?page={{ total_pages }}"> >> </a>
-    {% endif %}
-</div>
+        <span style="margin: 0 10px;">Page {{ page }} of {{ total_pages }}</span>
+
+        {% if page < total_pages %}
+            <a href="/?page={{ page + 1 }}&{{ query_string }}"> > </a>
+            <a href="/?page={{ total_pages }}&{{ query_string }}"> >> </a>
+        {% endif %}
+    </div>
+
 </body>
 </html>

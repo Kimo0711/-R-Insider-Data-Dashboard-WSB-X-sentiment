@@ -1,7 +1,9 @@
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, Query
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from urllib.parse import unquote
+from datetime import datetime, timedelta
+from typing import List
 import subprocess
 import yaml
 import json
@@ -285,4 +287,124 @@ def profile(request: Request, name: str, page: int = 1):
         "profile": profile_info,
         "page": page,
         "total_pages": total_pages
+    })
+
+@app.get("/dashboard", response_class=HTMLResponse)
+def dashboard(
+    request: Request,
+    page: int = 1,
+    name: str = "",
+    party: str = "",
+    state: str = "",
+    industry: List[str] = Query(default=[]),
+    committee: List[str] = Query(default=[]),
+    transaction: str = "",
+    range: str = "",
+    after: str = ""
+):
+    per_page = 100
+    cutoff_date = datetime.now() - timedelta(days=3 * 365)
+
+    # Parse user-provided date filter if valid
+    try:
+        after_date = datetime.strptime(after, "%Y-%m-%d") if after else cutoff_date
+    except ValueError:
+        after_date = cutoff_date
+
+    valid_trades = []
+    industry_set = set()
+    committee_set = set()
+    party_set = set()
+    state_set = set()
+    transaction_set = set()
+
+    for t in congress_data:
+        traded_str = t.get("Traded", "")
+        try:
+            traded_date = datetime.strptime(traded_str, "%Y-%m-%d")
+        except ValueError:
+            continue
+
+        if traded_date < after_date:
+            continue
+
+        bio = t.get("BioGuideID")
+        ticker = t.get("Ticker", "").upper()
+
+        if ticker in ticker_cache:
+            info = ticker_cache[ticker]
+        else:
+            info = fetch_company_info(ticker)
+
+        trade_industry = info.get("industry", "General")
+        # Collect filters
+        industry_set.add(trade_industry)
+        for c in get_committees(bio):
+            if c:
+                committee_set.add(c)
+        party_set.add(t.get("Party", ""))
+        state_set.add(state_lookup.get(bio, ""))
+        transaction_set.add(t.get("Transaction", ""))
+
+        # Apply filters
+        if name.lower() not in t.get("Name", "").lower():
+            continue
+        if party and t.get("Party", "") != party:
+            continue
+        if state and state_lookup.get(bio, "") != state:
+            continue
+        if industry and trade_industry not in industry:
+            continue
+        if transaction and t.get("Transaction", "") != transaction:
+            continue
+        if range and format_trade_size(t.get("Trade_Size_USD")) != range:
+            continue
+        committees = get_committees(bio)
+        if committee and not any(c in get_committees(bio) for c in committee):
+            continue
+
+        valid_trades.append({
+            "name": t.get("Name"),
+            "party": t.get("Party", ""),
+            "chamber": t.get("Chamber", ""),
+            "state": state_lookup.get(bio, ""),
+            "ticker": ticker,
+            "company_name": info["name"],
+            "industry": trade_industry,
+            "traded": t.get("Traded"),
+            "filed": t.get("Filed"),
+            "price": t.get("Price"),
+            "transaction": t.get("Transaction"),
+            "size": format_trade_size(t.get("Trade_Size_USD")),
+        })
+
+    total = len(valid_trades)
+    total_pages = (total + per_page - 1) // per_page
+    start = (page - 1) * per_page
+    end = start + per_page
+    paginated = valid_trades[start:end]
+
+    return templates.TemplateResponse("dashboard.html", {
+        "request": request,
+        "trades": paginated,
+        "page": page,
+        "total_pages": total_pages,
+        "filter_name": name,
+        "filter_party": party,
+        "filter_state": state,
+        "filter_industry": industry,
+        "filter_transaction": transaction,
+        "filter_range": range,
+        "filter_after": after,
+        "industry_options": sorted(industry_set),
+        "party_options": sorted(party_set),
+        "state_options": sorted(s for s in state_set if s),
+        "transaction_options": sorted(transaction_set),
+        "filter_committee": committee,
+        "committee_options": sorted(committee_set),
+        "range_options": [
+            "< 1K", "1K–15K", "15K–50K", "50K–100K",
+            "100K–250K", "250K–500K", "500K–1M", "1M–5M",
+            "5M–25M", "25M–50M", "50M+"
+        ]
     })

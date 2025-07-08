@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Recent Congressional Trades</title>
+    <style>
+        body {
+            background-color: #121212;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            margin: 0;
+        }
+
+        .filter-form {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            grid-auto-flow: row dense;
+            gap: 12px;
+            background-color: #1e1e1e;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+            width: 100%;
+            box-sizing: border-box;
+            position: relative;
+            overflow: visible;
+        }
+
+        .filter-form input[type="text"],
+        .filter-form input[type="date"],
+        .filter-form select,
+        .dropdown-button {
+            background-color: #2a2a2a;
+            color: #fff;
+            border: 1px solid #444;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 14px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .filter-form button {
+            background-color: #444;
+            color: white;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .filter-form button:hover {
+            background-color: #666;
+        }
+
+        /* DROPDOWN FIXES */
+
+        .dropdown {
+            position: relative;
+            min-width: 180px;
+            max-width: 100%;
+            z-index: 1;
+        }
+
+        .dropdown-button {
+            background-color: #2a2a2a;
+            color: #fff;
+            border: 1px solid #444;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 14px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            cursor: pointer;
+        }
+
+        .dropdown-content {
+            width: 320px;
+            max-height: 300px;
+            overflow-y: auto;
+            background-color: #1e1e1e;
+            border: 1px solid #444;
+            border-radius: 6px;
+            padding: 10px;
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 0;
+            z-index: 9999;
+            display: none;
+            box-sizing: border-box;
+        }
+
+        .dropdown.open .dropdown-content {
+            display: block;
+        }
+
+        .dropdown label {
+            display: block;
+            font-size: 14px;
+            margin: 5px 0;
+            white-space: nowrap;
+        }
+
+        /* TABLE */
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #333;
+        }
+
+        th {
+            background-color: #1e1e1e;
+        }
+
+        tr:hover {
+            background-color: #1a1a1a;
+        }
+
+        a {
+            color: #8ab4f8;
+            text-decoration: none;
+        }
+    </style>
+    <script>
+        function toggleDropdown(id) {
+            const el = document.getElementById(id);
+            el.classList.toggle("open");
+        }
+
+        document.addEventListener("click", function (event) {
+            const dropdowns = document.querySelectorAll(".dropdown");
+            dropdowns.forEach(d => {
+                if (!d.contains(event.target)) {
+                    d.classList.remove("open");
+                }
+            });
+        });
+    </script>
+</head>
+<body>
+
+<a href="/">← Back</a>
+<h1>Recent Congressional Trades (last 3 years)</h1>
+
+<form method="get" class="filter-form">
+    <input type="text" name="name" placeholder="Find by politician" value="{{ filter_name }}">
+    
+    <select name="party">
+        <option value="">Political Party</option>
+        {% for p in party_options %}
+            <option value="{{ p }}" {% if p == filter_party %}selected{% endif %}>{{ p }}</option>
+        {% endfor %}
+    </select>
+
+    <select name="state">
+        <option value="">Politician State</option>
+        {% for s in state_options %}
+            <option value="{{ s }}" {% if s == filter_state %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+    </select>
+
+    <div class="dropdown" id="industryDropdown">
+        <div class="dropdown-button" onclick="toggleDropdown('industryDropdown')">
+            {% if filter_industry %}
+            {{ filter_industry | length }} {{ "Industry" if filter_industry | length == 1 else "Industries" }} selected
+            {% else %}
+                Industry
+            {% endif %}
+        </div>
+        <div class="dropdown-content">
+            {% for ind in industry_options %}
+                <label>
+                    <input type="checkbox" name="industry" value="{{ ind }}"
+                        {% if ind in filter_industry %}checked{% endif %}>
+                    {{ ind }}
+                </label>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="dropdown" id="committeeDropdown">
+        <div class="dropdown-button" onclick="toggleDropdown('committeeDropdown')">
+            {% if filter_committee %}
+                {{ filter_committee | length }} Committee{{ 's' if filter_committee | length > 1 else '' }} selected
+            {% else %}
+                Committee
+            {% endif %}
+        </div>
+        <div class="dropdown-content">
+            {% for c in committee_options %}
+                <label>
+                    <input type="checkbox" name="committee" value="{{ c }}"
+                        {% if c in filter_committee %}checked{% endif %}>
+                    {{ c }}
+                </label>
+            {% endfor %}
+        </div>
+    </div>
+
+    <select name="transaction">
+        <option value="">Transaction Type</option>
+        {% for t in transaction_options %}
+            <option value="{{ t }}" {% if t == filter_transaction %}selected{% endif %}>{{ t }}</option>
+        {% endfor %}
+    </select>
+
+    <select name="range">
+        <option value="">Trade Size</option>
+        {% for r in range_options %}
+            <option value="{{ r }}" {% if r == filter_range %}selected{% endif %}>{{ r }}</option>
+        {% endfor %}
+    </select>
+
+    <input type="date" name="after" value="{{ filter_after }}">
+    <button type="submit">Apply</button>
+</form>
+
+<table>
+    <thead>
+        <tr>
+            <th>Politician</th>
+            <th>Party</th>
+            <th>State</th>
+            <th>Chamber</th>
+            <th>Company</th>
+            <th>Ticker</th>
+            <th>Industry</th>
+            <th>Traded</th>
+            <th>Filed</th>
+            <th>Type</th>
+            <th>Size</th>
+            <th>Price</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for t in trades %}
+        <tr>
+            <td><a href="/politician/{{ t.name | urlencode }}">{{ t.name }}</a></td>
+            <td>{{ t.party }}</td>
+            <td>{{ t.state }}</td>
+            <td>{{ t.chamber }}</td>
+            <td>{{ t.company_name }}</td>
+            <td>{{ t.ticker }}</td>
+            <td>{{ t.industry }}</td>
+            <td>{{ t.traded }}</td>
+            <td>{{ t.filed }}</td>
+            <td>{{ t.transaction }}</td>
+            <td>{{ t.size }}</td>
+            <td>${{ t.price }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<div style="margin-top: 30px;">
+    {% set query_string = (
+        'name=' ~ filter_name ~
+        '&party=' ~ filter_party ~
+        '&state=' ~ filter_state ~
+        '&transaction=' ~ filter_transaction ~
+        '&range=' ~ filter_range ~
+        '&after=' ~ filter_after
+    ) %}
+    
+    {% if page > 1 %}
+        <a href="?page=1&{{ query_string }}"><<</a>
+        <a href="?page={{ page - 1 }}&{{ query_string }}"><</a>
+    {% endif %}
+
+    <span style="margin: 0 10px;">Page {{ page }} of {{ total_pages }}</span>
+
+    {% if page < total_pages %}
+        <a href="?page={{ page + 1 }}&{{ query_string }}">></a>
+        <a href="?page={{ total_pages }}&{{ query_string }}">>></a>
+    {% endif %}
+</div>
+
+</body>
+</html>
