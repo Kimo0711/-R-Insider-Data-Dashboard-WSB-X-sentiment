@@ -10,7 +10,7 @@ import json
 import os
 import yfinance as yf
 from Backend import *
-from FrontEnd import *
+from Frontend import *
 
 app = FastAPI()
 
