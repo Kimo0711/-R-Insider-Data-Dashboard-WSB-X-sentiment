@@ -9,7 +9,7 @@ import yaml
 import json
 import os
 import yfinance as yf
-import backend 
+
 
 app = FastAPI()
 
