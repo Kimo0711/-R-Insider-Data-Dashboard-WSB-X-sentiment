@@ -10,12 +10,12 @@ import json
 import os
 import yfinance as yf
 
-======= Setup Paths =======
+
 BASE_DIR = os.path.dirname(file)
 DATA_DIR = os.path.join(BASE_DIR, "Backend", "insider_dashboard")
 CACHE_PATH = os.path.join(DATA_DIR, "ticker_cache.json")
 
-======= App & Templates =======
+
 app = FastAPI()
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "Frontend", "src", "templates"))
 
