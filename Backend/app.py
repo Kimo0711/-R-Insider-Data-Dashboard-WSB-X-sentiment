@@ -96,13 +96,12 @@ congress_data = []
 state_lookup = {}
 
 def load_state_lookup_from_yaml():
-    path = os.path.join(os.path.dirname(__file__), "legislators-historical.yaml")
-    with open(path, "r") as f:
-        data = yaml.safe_load(f)
-
+    data_dir = os.path.join(os.path.dirname(__file__), "insider_dashboard")
     lookup = {}
+
     for filename in ["legislators-current.yaml", "legislators-historical.yaml"]:
-        with open(filename, "r") as f:
+        path = os.path.join(data_dir, filename)
+        with open(path, "r") as f:
             data = yaml.safe_load(f)
             for person in data:
                 bio_id = person.get("id", {}).get("bioguide")
@@ -171,8 +170,10 @@ def startup_event():
 def shutdown_event():
     save_cache()
 
-committee_membership_file = "committee-membership-current.yaml"
-committees_historical_file = "committees-historical.yaml"
+data_dir = os.path.join(os.path.dirname(__file__), "insider_dashboard")
+
+committee_membership_file = os.path.join(data_dir, "committee-membership-current.yaml")
+committees_historical_file = os.path.join(data_dir, "committees-historical.yaml")
 
 # Load both YAML files once
 with open(committee_membership_file, "r") as f:
