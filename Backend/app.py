@@ -136,7 +136,7 @@ def startup_event():
         "--header", "Accept: application/json",
         "--header", "Authorization: Bearer d95376201ee52332b90d7ab3e527076011921658"
     ]
-     result = subprocess.run(
+result = subprocess.run(
         curl_command,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
