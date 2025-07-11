@@ -10,6 +10,7 @@ import json
 import os
 import yfinance as yf
 
+print("✅ app.py has started loading")
 
 app = FastAPI()
 
@@ -120,6 +121,11 @@ def startup_event():
     global congress_data, state_lookup, bio_to_committees
     load_cache()
     state_lookup = load_state_lookup_from_yaml()
+    
+@app.on_event("startup")
+def startup_event():
+    print("🚀 Startup event triggered")
+    ...
 
     # Load trading data
     curl_command = [
