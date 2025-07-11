@@ -8,6 +8,7 @@ import subprocess
 import yaml
 import json
 import os
+import asyncio
 import yfinance as yf
 
 print("✅ app.py has started loading")
@@ -15,8 +16,8 @@ print("✅ app.py has started loading")
 app = FastAPI()
 
 # ---- Caching Setup ----
-ticker_cache = {}
-CACHE_PATH = "ticker_cache.json"
+ ticker_cache = {}
+ CACHE_PATH = "ticker_cache.json"
 
 def load_cache():
     global ticker_cache
@@ -27,6 +28,7 @@ def load_cache():
         except Exception as e:
             print("Failed to load ticker cache:", e)
             ticker_cache = {}
+
 
 def save_cache():
     with open(CACHE_PATH, "w") as f:
@@ -48,10 +50,7 @@ def fetch_company_info(ticker: str) -> dict:
         if not isinstance(name, str) or name.strip().isdigit():
             name = ticker  # fallback to ticker only if valid name not found
 
-        result = {
-            "name": name,
-            "industry": info.get("industry", "General")
-        }
+        result = {"name": name, "industry": info.get("industry", "General")}
         ticker_cache[ticker] = result
         save_cache()
         return result
@@ -90,11 +89,14 @@ def format_trade_size(amount_str):
     else:
         return "50M+"
 
+# Templates
 templates = Jinja2Templates(directory="../../Frontend/src/templates")
 templates.env.filters["format_trade_size"] = format_trade_size
 
+# Globals for data
 congress_data = []
 state_lookup = {}
+bio_to_committees = {}
 
 def load_state_lookup_from_yaml():
     data_dir = os.path.join(os.path.dirname(__file__), "insider_dashboard")
@@ -114,57 +116,63 @@ def load_state_lookup_from_yaml():
                         lookup[bio_id] = state
     return lookup
 
-bio_to_committees = {}
+# Load both YAML files once
+ data_dir = os.path.join(os.path.dirname(__file__), "insider_dashboard")
+ committee_membership_file = os.path.join(data_dir, "committee-membership-current.yaml")
+ committees_historical_file = os.path.join(data_dir, "committees-historical.yaml")
+
+with open(committee_membership_file, "r") as f:
+    membership_data = yaml.safe_load(f)
+
+with open(committees_historical_file, "r") as f:
+    historical_data = yaml.safe_load(f)
+
+# Map thomas_id to committee name
+ thomas_to_name = {
+     entry.get("thomas_id"): entry.get("name", "Unknown Committee")
+     for entry in historical_data if "thomas_id" in entry
+ }
 
 @app.on_event("startup")
-def startup_event():
-    global congress_data, state_lookup, bio_to_committees, membership_data, historical_data
+async def startup_event():
+    global state_lookup
+    # Fast init
     load_cache()
     state_lookup = load_state_lookup_from_yaml()
+    print("✅ Quick startup tasks done – server can bind now.")
 
-    # Load YAML data
-    data_dir = os.path.join(os.path.dirname(__file__), "insider_dashboard")
-    committee_membership_file = os.path.join(data_dir, "committee-membership-current.yaml")
-    committees_historical_file = os.path.join(data_dir, "committees-historical.yaml")
+    # Schedule background load
+    asyncio.create_task(load_congress_data())
 
-    try:
-        with open(committee_membership_file, "r") as f:
-            membership_data = yaml.safe_load(f)
+async def load_congress_data():
+    global congress_data, bio_to_committees
+    print("🚀 Background: loading congress trading data…")
 
-        with open(committees_historical_file, "r") as f:
-            historical_data = yaml.safe_load(f)
-    except Exception as e:
-        print("❌ Failed to load YAML files:", e)
-        membership_data = {}
-        historical_data = []
-
-    # Load trading data
-    curl_command = [
-        "curl",
-        "-s",
+    curl_cmd = [
+        "curl", "-s",
         "--request", "GET",
         "--url", "https://api.quiverquant.com/beta/bulk/congresstrading",
         "--header", "Accept: application/json",
-        "--header", "Authorization: Bearer d95376201ee52332b90d7ab3e527076011921658"
+        "--header", "Authorization: Bearer d95376201ee52332b90d7ab3e527076011921658",
     ]
 
     try:
-        result = subprocess.run(
-            curl_command,
+        result = await asyncio.to_thread(
+            subprocess.run,
+            curl_cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
             timeout=10
         )
         congress_data = json.loads(result.stdout)
-        print(f"✅ Loaded {len(congress_data)} trading records.")
+        print(f"✅ Loaded {len(congress_data)} records.")
     except subprocess.TimeoutExpired:
-        print("❌ Curl command timed out.")
+        print("❌ Curl timed out.")
     except Exception as e:
-        print("❌ Failed to fetch or parse congress trading data:", e)
-        congress_data = []
+        print("❌ Congress data load failed:", e)
 
-    # Build committee lookup
+    # Build committee mapping
     id_to_names = {}
     for entry in historical_data:
         base_id = entry.get("thomas_id")
@@ -173,51 +181,23 @@ def startup_event():
         id_to_names[base_id] = entry.get("name", f"Committee {base_id}")
         for sub in entry.get("subcommittees", []):
             sub_id = sub.get("thomas_id", "")
-            full_id = base_id + sub_id
-            id_to_names[full_id] = entry.get("name", f"Committee {full_id}")
+            id_to_names[base_id + sub_id] = entry.get("name", f"Committee {base_id + sub_id}")
 
+    bio_to_committees = {}
     for committee_id, members in membership_data.items():
         for member in members:
             bio = member.get("bioguide")
             if not bio:
                 continue
-            if bio not in bio_to_committees:
-                bio_to_committees[bio] = set()
-            name = id_to_names.get(committee_id)
-            if name:
-                bio_to_committees[bio].add(name)
+            bio_to_committees.setdefault(bio, set()).add(id_to_names.get(committee_id, committee_id))
 
-    # Convert sets to sorted lists
     for bio, committees in bio_to_committees.items():
         bio_to_committees[bio] = sorted(committees)
-
-    print("✅ Startup complete.")
-
+    print("✅ Committee mappings ready.")
 
 @app.on_event("shutdown")
 def shutdown_event():
     save_cache()
-
-data_dir = os.path.join(os.path.dirname(__file__), "insider_dashboard")
-
-committee_membership_file = os.path.join(data_dir, "committee-membership-current.yaml")
-committees_historical_file = os.path.join(data_dir, "committees-historical.yaml")
-
-# Load both YAML files once
-with open(committee_membership_file, "r") as f:
-    membership_data = yaml.safe_load(f)
-
-with open(committees_historical_file, "r") as f:
-    historical_data = yaml.safe_load(f)
-
-# Map thomas_id to committee name
-thomas_to_name = {
-    entry.get("thomas_id"): entry.get("name", "Unknown Committee")
-    for entry in historical_data if "thomas_id" in entry
-}
-
-def get_committees(bioguide_id):
-    return bio_to_committees.get(bioguide_id, [])
 
 @app.get("/", response_class=HTMLResponse)
 def homepage(request: Request, page: int = 1, name: str = "", party: str = "", state: str = "", committee: str = ""):
@@ -227,7 +207,7 @@ def homepage(request: Request, page: int = 1, name: str = "", party: str = "", s
         person_name = item.get("Name")
         bio_id = item.get("BioGuideID")
         state_value = state_lookup.get(bio_id, "")
-        committees = get_committees(bio_id)
+        committees = bio_to_committees.get(bio_id, [])
 
         if person_name not in grouped:
             grouped[person_name] = {
@@ -300,7 +280,7 @@ def profile(request: Request, name: str, page: int = 1):
         trade["industry"] = info["industry"]
 
     bio_id = trades[0].get("BioGuideID")
-    committees = get_committees(bio_id)
+    committees = bio_to_committees.get(bio_id, [])
     state = state_lookup.get(bio_id, "")
 
     profile_info = {
@@ -308,7 +288,7 @@ def profile(request: Request, name: str, page: int = 1):
         "party": trades[0].get("Party", ""),
         "chamber": trades[0].get("Chamber", ""),
         "state": state,
-        "committee" : committees,
+        "committee": committees,
         "trades": page_trades
     }
 
@@ -335,7 +315,6 @@ def dashboard(
     per_page = 100
     cutoff_date = datetime.now() - timedelta(days=3 * 365)
 
-    # Parse user-provided date filter if valid
     try:
         after_date = datetime.strptime(after, "%Y-%m-%d") if after else cutoff_date
     except ValueError:
@@ -367,74 +346,11 @@ def dashboard(
             info = fetch_company_info(ticker)
 
         trade_industry = info.get("industry", "General")
-        # Collect filters
         industry_set.add(trade_industry)
-        for c in get_committees(bio):
-            if c:
-                committee_set.add(c)
+        for c in bio_to_committees.get(bio, []):
+            committee_set.add(c)
         party_set.add(t.get("Party", ""))
         state_set.add(state_lookup.get(bio, ""))
         transaction_set.add(t.get("Transaction", ""))
 
-        # Apply filters
         if name.lower() not in t.get("Name", "").lower():
-            continue
-        if party and t.get("Party", "") != party:
-            continue
-        if state and state_lookup.get(bio, "") != state:
-            continue
-        if industry and trade_industry not in industry:
-            continue
-        if transaction and t.get("Transaction", "") != transaction:
-            continue
-        if range and format_trade_size(t.get("Trade_Size_USD")) != range:
-            continue
-        committees = get_committees(bio)
-        if committee and not any(c in get_committees(bio) for c in committee):
-            continue
-
-        valid_trades.append({
-            "name": t.get("Name"),
-            "party": t.get("Party", ""),
-            "chamber": t.get("Chamber", ""),
-            "state": state_lookup.get(bio, ""),
-            "ticker": ticker,
-            "company_name": info["name"],
-            "industry": trade_industry,
-            "traded": t.get("Traded"),
-            "filed": t.get("Filed"),
-            "price": t.get("Price"),
-            "transaction": t.get("Transaction"),
-            "size": format_trade_size(t.get("Trade_Size_USD")),
-        })
-
-    total = len(valid_trades)
-    total_pages = (total + per_page - 1) // per_page
-    start = (page - 1) * per_page
-    end = start + per_page
-    paginated = valid_trades[start:end]
-
-    return templates.TemplateResponse("dashboard.html", {
-        "request": request,
-        "trades": paginated,
-        "page": page,
-        "total_pages": total_pages,
-        "filter_name": name,
-        "filter_party": party,
-        "filter_state": state,
-        "filter_industry": industry,
-        "filter_transaction": transaction,
-        "filter_range": range,
-        "filter_after": after,
-        "industry_options": sorted(industry_set),
-        "party_options": sorted(party_set),
-        "state_options": sorted(s for s in state_set if s),
-        "transaction_options": sorted(transaction_set),
-        "filter_committee": committee,
-        "committee_options": sorted(committee_set),
-        "range_options": [
-            "< 1K", "1K–15K", "15K–50K", "50K–100K",
-            "100K–250K", "250K–500K", "500K–1M", "1M–5M",
-            "5M–25M", "25M–50M", "50M+"
-        ]
-    })
