@@ -136,13 +136,19 @@ def startup_event():
         "--header", "Accept: application/json",
         "--header", "Authorization: Bearer d95376201ee52332b90d7ab3e527076011921658"
     ]
-    result = subprocess.run(curl_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    try:
-        congress_data = json.loads(result.stdout)
-        print(f"Loaded {len(congress_data)} records.")
-    except Exception as e:
-        print("Failed to parse JSON:", e)
-        print("Output:", result.stdout[:300])
+     result = subprocess.run(
+        curl_command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        timeout=10  # 10-second max timeout
+    )
+    congress_data = json.loads(result.stdout)
+    print(f"Loaded {len(congress_data)} records.")
+except subprocess.TimeoutExpired:
+    print("❌ Curl command timed out.")
+except Exception as e:
+    print("❌ Failed to parse congress data:", e)
 
     # Precompute committee mapping
     id_to_names = {}
