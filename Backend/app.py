@@ -118,14 +118,25 @@ bio_to_committees = {}
 
 @app.on_event("startup")
 def startup_event():
-    global congress_data, state_lookup, bio_to_committees
+    global congress_data, state_lookup, bio_to_committees, membership_data, historical_data
     load_cache()
     state_lookup = load_state_lookup_from_yaml()
-    
-@app.on_event("startup")
-def startup_event():
-    print("🚀 Startup event triggered")
-    ...
+
+    # Load YAML data
+    data_dir = os.path.join(os.path.dirname(__file__), "insider_dashboard")
+    committee_membership_file = os.path.join(data_dir, "committee-membership-current.yaml")
+    committees_historical_file = os.path.join(data_dir, "committees-historical.yaml")
+
+    try:
+        with open(committee_membership_file, "r") as f:
+            membership_data = yaml.safe_load(f)
+
+        with open(committees_historical_file, "r") as f:
+            historical_data = yaml.safe_load(f)
+    except Exception as e:
+        print("❌ Failed to load YAML files:", e)
+        membership_data = {}
+        historical_data = []
 
     # Load trading data
     curl_command = [
@@ -137,22 +148,23 @@ def startup_event():
         "--header", "Authorization: Bearer d95376201ee52332b90d7ab3e527076011921658"
     ]
 
-try:
-    result = subprocess.run(
-        curl_command,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        timeout=10  # 10-second max timeout
-    )
-    congress_data = json.loads(result.stdout)
-    print(f"Loaded {len(congress_data)} records.")
-except subprocess.TimeoutExpired:
-    print("❌ Curl command timed out.")
-except Exception as e:
-    print("❌ Failed to parse congress data:", e)
+    try:
+        result = subprocess.run(
+            curl_command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=10
+        )
+        congress_data = json.loads(result.stdout)
+        print(f"✅ Loaded {len(congress_data)} trading records.")
+    except subprocess.TimeoutExpired:
+        print("❌ Curl command timed out.")
+    except Exception as e:
+        print("❌ Failed to fetch or parse congress trading data:", e)
+        congress_data = []
 
-    # Precompute committee mapping
+    # Build committee lookup
     id_to_names = {}
     for entry in historical_data:
         base_id = entry.get("thomas_id")
@@ -175,9 +187,11 @@ except Exception as e:
             if name:
                 bio_to_committees[bio].add(name)
 
-    # convert sets to sorted lists for later use
+    # Convert sets to sorted lists
     for bio, committees in bio_to_committees.items():
         bio_to_committees[bio] = sorted(committees)
+
+    print("✅ Startup complete.")
 
 
 @app.on_event("shutdown")
