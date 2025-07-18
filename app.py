@@ -86,7 +86,7 @@ def format_trade_size(amount_str):
         return '50M+'
 
 # Templates setup
-templates = Jinja2Templates(directory='../../Frontend/src/templates')
+templates = Jinja2Templates(directory='/Frontend/src/templates')
 templates.env.filters['format_trade_size'] = format_trade_size
 
 # Globals for data storage
@@ -97,7 +97,7 @@ bio_to_committees = {}
 def load_state_lookup_from_yaml():
     data_dir = os.path.join(os.path.dirname(__file__), 'insider_dashboard')
     lookup = {}
-    for filename in ['legislators-current.yaml', 'legislators-historical.yaml']:
+    for filename in ['Backend/insider_dashboard/legislators-current.yaml', 'Backend/insider_dashboard/legislators-historical.yaml']:
         path = os.path.join(data_dir, filename)
         with open(path, 'r') as f:
             data = yaml.safe_load(f)
@@ -111,9 +111,9 @@ def load_state_lookup_from_yaml():
     return lookup
 
 # Load committee membership & history at import time
-base_dir = os.path.join(os.path.dirname(__file__), 'insider_dashboard')
-committee_membership_file = os.path.join(base_dir, 'committee-membership-current.yaml')
-committees_historical_file = os.path.join(base_dir, 'committees-historical.yaml')
+base_dir = os.path.join(os.path.dirname(__file__), 'Backend/insider_dashboard')
+committee_membership_file = os.path.join(base_dir, 'Backend/insider_dashboard/committee-membership-current.yaml')
+committees_historical_file = os.path.join(base_dir, 'Backend/insider_dashboard/committees-historical.yaml')
 with open(committee_membership_file, 'r') as f:
     membership_data = yaml.safe_load(f)
 with open(committees_historical_file, 'r') as f:
